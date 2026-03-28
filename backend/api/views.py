@@ -21,6 +21,8 @@ from django_filters.rest_framework import DjangoFilterBackend
 
 from api.permissions import IsAuthorOrReadOnly
 
+from django.http import HttpResponseRedirect
+from django.shortcuts import get_object_or_404
 
 class UserViewSet(DjoserUserViewSet):
     permission_classes = (permissions.AllowAny,)
@@ -210,3 +212,21 @@ class RecipeViewSet(viewsets.ModelViewSet):
 
         shopping_cart.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(
+        detail=True,
+        methods=('get',),
+        permission_classes=(permissions.AllowAny,),
+        url_path='get-link'
+    )
+    def get_link(self, request, pk=None):
+        recipe = self.get_object()
+        short_link = request.build_absolute_uri(f'/s/{recipe.short_code}/')
+        return Response(
+            {'short-link': short_link},
+            status=status.HTTP_200_OK
+        )
+
+def redirect_short_link(request, short_code):
+    recipe = get_object_or_404(Recipe, short_code=short_code)
+    return HttpResponseRedirect(f'/recipes/{recipe.id}')

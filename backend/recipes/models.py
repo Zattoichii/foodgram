@@ -3,6 +3,8 @@ from django.db import models
 
 from users.models import User
 
+import uuid
+
 
 class Tag(models.Model):
     name = models.CharField(
@@ -87,6 +89,18 @@ class Recipe(models.Model):
         'Дата публикации',
         auto_now_add=True,
     )
+    short_code = models.CharField(
+        'Короткий код',
+        max_length=12,
+        unique=True,
+        blank=True,
+        editable=False,
+    )
+
+    def save(self, *args, **kwargs):
+        if not self.short_code:
+            self.short_code = uuid.uuid4().hex[:8]
+        super().save(*args, **kwargs)
 
     class Meta:
         verbose_name = 'Рецепт'
