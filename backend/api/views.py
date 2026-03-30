@@ -120,6 +120,7 @@ class UserViewSet(DjoserUserViewSet):
         request.user.avatar.delete(save=True)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+
 class TagViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Tag.objects.all()
     serializer_class = TagSerializer
@@ -134,6 +135,7 @@ class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
     pagination_class = None
     filter_backends = (SearchFilter,)
     search_fields = ('^name',)
+
 
 class RecipeViewSet(viewsets.ModelViewSet):
     queryset = Recipe.objects.all().select_related(
@@ -167,7 +169,10 @@ class RecipeViewSet(viewsets.ModelViewSet):
 
         Favorite.objects.create(user=request.user, recipe=recipe)
 
-        serializer = ShortRecipeSerializer(recipe, context={'request': request})
+        serializer = ShortRecipeSerializer(
+            recipe,
+            context={'request': request}
+        )
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     @favorite.mapping.delete
@@ -192,7 +197,9 @@ class RecipeViewSet(viewsets.ModelViewSet):
     def shopping_cart(self, request, pk=None):
         recipe = self.get_object()
 
-        if ShoppingCart.objects.filter(user=request.user, recipe=recipe).exists():
+        if ShoppingCart.objects.filter(
+                user=request.user,
+                recipe=recipe).exists():
             return Response(
                 {'errors': 'Рецепт уже добавлен в список покупок.'},
                 status=status.HTTP_400_BAD_REQUEST
@@ -200,7 +207,10 @@ class RecipeViewSet(viewsets.ModelViewSet):
 
         ShoppingCart.objects.create(user=request.user, recipe=recipe)
 
-        serializer = ShortRecipeSerializer(recipe, context={'request': request})
+        serializer = ShortRecipeSerializer(
+            recipe,
+            context={'request': request}
+        )
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     @shopping_cart.mapping.delete
@@ -266,8 +276,10 @@ class RecipeViewSet(viewsets.ModelViewSet):
             shopping_list,
             content_type='text/plain; charset=utf-8'
         )
-        response['Content-Disposition'] = 'attachment; filename="shopping_list.txt"'
+        response['Content-Disposition'] = \
+            'attachment; filename="shopping_list.txt"'
         return response
+
 
 def redirect_short_link(request, short_code):
     recipe = get_object_or_404(Recipe, short_code=short_code)

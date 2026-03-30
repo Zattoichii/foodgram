@@ -18,6 +18,7 @@ class Base64ImageField(serializers.ImageField):
             data = ContentFile(base64.b64decode(imgstr), name=f'temp.{ext}')
         return super().to_internal_value(data)
 
+
 class UserCreateSerializer(UserCreateSerializer):
     class Meta(UserCreateSerializer.Meta):
         model = User
@@ -29,6 +30,7 @@ class UserCreateSerializer(UserCreateSerializer):
             'last_name',
             'password',
         )
+
 
 class UserSerializer(UserSerializer):
     is_subscribed = serializers.SerializerMethodField()
@@ -104,6 +106,7 @@ class SubscriptionSerializer(UserSerializer):
     def get_recipes_count(self, obj):
         return obj.recipes.count()
 
+
 class TagSerializer(serializers.ModelSerializer):
     class Meta:
         model = Tag
@@ -123,10 +126,13 @@ class IngredientSerializer(serializers.ModelSerializer):
             'measurement_unit',
         )
 
+
 class RecipeIngredientReadSerializer(serializers.ModelSerializer):
     id = serializers.ReadOnlyField(source='ingredient.id')
     name = serializers.ReadOnlyField(source='ingredient.name')
-    measurement_unit = serializers.ReadOnlyField(source='ingredient.measurement_unit')
+    measurement_unit = serializers.ReadOnlyField(
+        source='ingredient.measurement_unit'
+    )
 
     class Meta:
         model = RecipeIngredient
@@ -136,6 +142,7 @@ class RecipeIngredientReadSerializer(serializers.ModelSerializer):
             'measurement_unit',
             'amount',
         )
+
 
 class RecipeReadSerializer(serializers.ModelSerializer):
     author = UserSerializer(read_only=True)
@@ -204,9 +211,13 @@ class RecipeWriteSerializer(serializers.ModelSerializer):
 
     def validate_tags(self, value):
         if not value:
-            raise serializers.ValidationError('Нужно выбрать хотя бы один тег.')
+            raise serializers.ValidationError(
+                'Нужно выбрать хотя бы один тег.'
+            )
         if len(value) != len(set(value)):
-            raise serializers.ValidationError('Теги не должны повторяться.')
+            raise serializers.ValidationError(
+                'Теги не должны повторяться.'
+            )
         return value
 
     def validate_ingredients(self, value):

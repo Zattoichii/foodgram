@@ -10,7 +10,8 @@ class Command(BaseCommand):
     help = 'Загружает ингредиенты из JSON'
 
     def handle(self, *args, **options):
-        file_path = Path(__file__).resolve().parents[4] / 'data' / 'ingredients.json'
+        file_path = \
+            Path(__file__).resolve().parents[4] / 'data' / 'ingredients.json'
 
         with open(file_path, encoding='utf-8') as file:
             data = json.load(file)
