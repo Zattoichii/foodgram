@@ -232,7 +232,9 @@ class RecipeWriteSerializer(serializers.ModelSerializer):
                 'Ингредиенты не должны повторяться.'
             )
 
-        ingredient_count = Ingredient.objects.filter(id__in=ingredient_ids).count()
+        ingredient_count = Ingredient.objects.filter(
+            id__in=ingredient_ids
+        ).count()
         if ingredient_count != len(ingredient_ids):
             raise serializers.ValidationError(
                 'Один или несколько ингредиентов не существуют.'
