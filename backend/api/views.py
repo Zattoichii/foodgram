@@ -1,7 +1,12 @@
+from django.db.models import Sum
+from django.http import HttpResponse, HttpResponseRedirect
+from django.shortcuts import get_object_or_404
+
+from django_filters.rest_framework import DjangoFilterBackend
 from djoser.views import UserViewSet as DjoserUserViewSet
 from rest_framework import permissions, status, viewsets
-from rest_framework.filters import SearchFilter
 from rest_framework.decorators import action
+from rest_framework.filters import SearchFilter
 from rest_framework.response import Response
 
 from api.filters import RecipeFilter
@@ -15,14 +20,16 @@ from api.serializers import (
     SubscriptionSerializer,
     TagSerializer,
 )
+from recipes.models import (
+    Favorite,
+    Ingredient,
+    Recipe,
+    RecipeIngredient,
+    ShoppingCart,
+    Tag,
+)
 from users.models import Subscription, User
-from recipes.models import Ingredient, Recipe, Tag, Favorite, ShoppingCart
-from django_filters.rest_framework import DjangoFilterBackend
 
-from api.permissions import IsAuthorOrReadOnly
-
-from django.http import HttpResponseRedirect
-from django.shortcuts import get_object_or_404
 
 class UserViewSet(DjoserUserViewSet):
     permission_classes = (permissions.AllowAny,)
@@ -226,6 +233,41 @@ class RecipeViewSet(viewsets.ModelViewSet):
             {'short-link': short_link},
             status=status.HTTP_200_OK
         )
+
+    @action(
+        detail=False,
+        methods=('get',),
+        permission_classes=(permissions.IsAuthenticated,),
+        url_path='download_shopping_cart'
+    )
+    def download_shopping_cart(self, request):
+        ingredients = (
+            RecipeIngredient.objects
+            .filter(recipe__in_shopping_carts__user=request.user)
+            .values(
+                'ingredient__name',
+                'ingredient__measurement_unit'
+            )
+            .annotate(total_amount=Sum('amount'))
+            .order_by('ingredient__name')
+        )
+
+        lines = ['Список покупок:\n']
+
+        for item in ingredients:
+            name = item['ingredient__name']
+            unit = item['ingredient__measurement_unit']
+            amount = item['total_amount']
+            lines.append(f'{name} ({unit}) — {amount}')
+
+        shopping_list = '\n'.join(lines)
+
+        response = HttpResponse(
+            shopping_list,
+            content_type='text/plain; charset=utf-8'
+        )
+        response['Content-Disposition'] = 'attachment; filename="shopping_list.txt"'
+        return response
 
 def redirect_short_link(request, short_code):
     recipe = get_object_or_404(Recipe, short_code=short_code)
