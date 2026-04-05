@@ -6,7 +6,14 @@ from rest_framework import serializers
 
 from djoser.serializers import UserCreateSerializer, UserSerializer
 
-from recipes.models import Ingredient, Recipe, RecipeIngredient, Tag
+from recipes.models import (
+    Ingredient,
+    Recipe,
+    RecipeIngredient,
+    Tag,
+    Favorite,
+    ShoppingCart,
+)
 from users.models import Subscription, User
 
 
@@ -321,4 +328,51 @@ class SubscribeSerializer(serializers.ModelSerializer):
         return Subscription.objects.create(
             user=self.context['request'].user,
             author=self.context['author']
+        )
+
+
+class FavoriteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Favorite
+        fields = ('user', 'recipe')
+        read_only_fields = ('user', 'recipe')
+
+    def validate(self, attrs):
+        request = self.context['request']
+        recipe = self.context['recipe']
+
+        if Favorite.objects.filter(user=request.user, recipe=recipe).exists():
+            raise serializers.ValidationError(
+                {'errors': 'Рецепт уже добавлен в избранное.'}
+            )
+
+        return attrs
+
+    def create(self, validated_data):
+        return Favorite.objects.create(
+            user=self.context['request'].user,
+            recipe=self.context['recipe']
+        )
+
+class ShoppingCartSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ShoppingCart
+        fields = ('user', 'recipe')
+        read_only_fields = ('user', 'recipe')
+
+    def validate(self, attrs):
+        request = self.context['request']
+        recipe = self.context['recipe']
+
+        if ShoppingCart.objects.filter(user=request.user, recipe=recipe).exists():
+            raise serializers.ValidationError(
+                {'errors': 'Рецепт уже добавлен в список покупок.'}
+            )
+
+        return attrs
+
+    def create(self, validated_data):
+        return ShoppingCart.objects.create(
+            user=self.context['request'].user,
+            recipe=self.context['recipe']
         )
