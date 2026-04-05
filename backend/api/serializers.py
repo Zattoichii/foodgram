@@ -183,17 +183,17 @@ class RecipeReadSerializer(serializers.ModelSerializer):
     def get_is_favorited(self, obj):
         request = self.context.get('request')
         return (
-                request
-                and request.user.is_authenticated
-                and obj.favorited_by.filter(user=request.user).exists()
+            request
+            and request.user.is_authenticated
+            and obj.favorited_by.filter(user=request.user).exists()
         )
 
     def get_is_in_shopping_cart(self, obj):
         request = self.context.get('request')
         return (
-                request
-                and request.user.is_authenticated
-                and obj.in_shopping_carts.filter(user=request.user).exists()
+            request
+            and request.user.is_authenticated
+            and obj.in_shopping_carts.filter(user=request.user).exists()
         )
 
 
@@ -317,7 +317,10 @@ class SubscribeSerializer(serializers.ModelSerializer):
                 {'errors': 'Нельзя подписаться на самого себя.'}
             )
 
-        if Subscription.objects.filter(user=request.user, author=author).exists():
+        if Subscription.objects.filter(
+                user=request.user,
+                author=author
+        ).exists():
             raise serializers.ValidationError(
                 {'errors': 'Вы уже подписаны на этого автора.'}
             )
@@ -354,6 +357,7 @@ class FavoriteSerializer(serializers.ModelSerializer):
             recipe=self.context['recipe']
         )
 
+
 class ShoppingCartSerializer(serializers.ModelSerializer):
     class Meta:
         model = ShoppingCart
@@ -364,7 +368,10 @@ class ShoppingCartSerializer(serializers.ModelSerializer):
         request = self.context['request']
         recipe = self.context['recipe']
 
-        if ShoppingCart.objects.filter(user=request.user, recipe=recipe).exists():
+        if ShoppingCart.objects.filter(
+                user=request.user,
+                recipe=recipe
+        ).exists():
             raise serializers.ValidationError(
                 {'errors': 'Рецепт уже добавлен в список покупок.'}
             )
