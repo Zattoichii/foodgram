@@ -1,4 +1,4 @@
-from django.db.models import Sum
+from django.db.models import Sum, Count
 from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 
@@ -19,6 +19,7 @@ from api.serializers import (
     ShortRecipeSerializer,
     SubscriptionSerializer,
     TagSerializer,
+    SubscribeSerializer,
 )
 from recipes.models import (
     Favorite,
@@ -40,7 +41,11 @@ class UserViewSet(DjoserUserViewSet):
         permission_classes=(permissions.IsAuthenticated,)
     )
     def subscriptions(self, request):
-        authors = User.objects.filter(subscribers__user=request.user)
+        authors = User.objects.filter(
+            subscribers__user=request.user
+        ).annotate(
+            recipes_count=Count('recipes', distinct=True)
+        )
         page = self.paginate_queryset(authors)
         serializer = SubscriptionSerializer(
             page,
@@ -57,24 +62,19 @@ class UserViewSet(DjoserUserViewSet):
     def subscribe(self, request, id=None):
         author = self.get_object()
 
-        if request.user == author:
-            return Response(
-                {'errors': 'Нельзя подписаться на самого себя.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        serializer = SubscribeSerializer(
+            data={},
+            context={
+                'request': request,
+                'author': author,
+            }
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
 
-        subscription_exists = Subscription.objects.filter(
-            user=request.user,
-            author=author
-        ).exists()
-
-        if subscription_exists:
-            return Response(
-                {'errors': 'Вы уже подписаны на этого автора.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        Subscription.objects.create(user=request.user, author=author)
+        author = User.objects.annotate(
+            recipes_count=Count('recipes', distinct=True)
+        ).get(pk=author.pk)
 
         serializer = SubscriptionSerializer(
             author,

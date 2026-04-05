@@ -81,7 +81,7 @@ class ShortRecipeSerializer(serializers.ModelSerializer):
 
 class SubscriptionSerializer(UserSerializer):
     recipes = serializers.SerializerMethodField()
-    recipes_count = serializers.SerializerMethodField()
+    recipes_count = serializers.IntegerField(read_only=True)
 
     class Meta(UserSerializer.Meta):
         fields = UserSerializer.Meta.fields + (
@@ -94,17 +94,19 @@ class SubscriptionSerializer(UserSerializer):
         recipes = obj.recipes.all()
 
         recipes_limit = request.query_params.get('recipes_limit')
-        if recipes_limit and recipes_limit.isdigit():
-            recipes = recipes[:int(recipes_limit)]
+        if recipes_limit is not None:
+            try:
+                recipes_limit = int(recipes_limit)
+                if recipes_limit > 0:
+                    recipes = recipes[:recipes_limit]
+            except (TypeError, ValueError):
+                pass
 
         return ShortRecipeSerializer(
             recipes,
             many=True,
             context=self.context
         ).data
-
-    def get_recipes_count(self, obj):
-        return obj.recipes.count()
 
 
 class TagSerializer(serializers.ModelSerializer):
@@ -173,20 +175,31 @@ class RecipeReadSerializer(serializers.ModelSerializer):
 
     def get_is_favorited(self, obj):
         request = self.context.get('request')
-        if not request or request.user.is_anonymous:
-            return False
-        return obj.favorited_by.filter(user=request.user).exists()
+        return (
+                request
+                and request.user.is_authenticated
+                and obj.favorited_by.filter(user=request.user).exists()
+        )
 
     def get_is_in_shopping_cart(self, obj):
         request = self.context.get('request')
-        if not request or request.user.is_anonymous:
-            return False
-        return obj.in_shopping_carts.filter(user=request.user).exists()
+        return (
+                request
+                and request.user.is_authenticated
+                and obj.in_shopping_carts.filter(user=request.user).exists()
+        )
 
 
-class RecipeIngredientWriteSerializer(serializers.Serializer):
-    id = serializers.IntegerField()
+class RecipeIngredientWriteSerializer(serializers.ModelSerializer):
+    id = serializers.PrimaryKeyRelatedField(
+        source='ingredient',
+        queryset=Ingredient.objects.all()
+    )
     amount = serializers.IntegerField(min_value=1)
+
+    class Meta:
+        model = RecipeIngredient
+        fields = ('id', 'amount')
 
 
 class RecipeWriteSerializer(serializers.ModelSerializer):
@@ -209,44 +222,42 @@ class RecipeWriteSerializer(serializers.ModelSerializer):
             'cooking_time',
         )
 
-    def validate_tags(self, value):
-        if not value:
-            raise serializers.ValidationError(
-                'Нужно выбрать хотя бы один тег.'
-            )
-        if len(value) != len(set(value)):
-            raise serializers.ValidationError(
-                'Теги не должны повторяться.'
-            )
-        return value
+    def validate(self, attrs):
+        request = self.context.get('request')
+        is_partial = request and request.method in ('PATCH', 'PUT')
 
-    def validate_ingredients(self, value):
-        if not value:
-            raise serializers.ValidationError(
-                'Нужно добавить хотя бы один ингредиент.'
-            )
+        tags = attrs.get('tags')
+        ingredients = attrs.get('ingredients')
 
-        ingredient_ids = [item['id'] for item in value]
-        if len(ingredient_ids) != len(set(ingredient_ids)):
-            raise serializers.ValidationError(
-                'Ингредиенты не должны повторяться.'
-            )
+        if not is_partial or 'tags' in self.initial_data:
+            if not tags:
+                raise serializers.ValidationError(
+                    {'tags': 'Нужно выбрать хотя бы один тег.'}
+                )
+            if len(tags) != len(set(tags)):
+                raise serializers.ValidationError(
+                    {'tags': 'Теги не должны повторяться.'}
+                )
 
-        ingredient_count = Ingredient.objects.filter(
-            id__in=ingredient_ids
-        ).count()
-        if ingredient_count != len(ingredient_ids):
-            raise serializers.ValidationError(
-                'Один или несколько ингредиентов не существуют.'
-            )
+        if not is_partial or 'ingredients' in self.initial_data:
+            if not ingredients:
+                raise serializers.ValidationError(
+                    {'ingredients': 'Нужно добавить хотя бы один ингредиент.'}
+                )
 
-        return value
+            ingredient_ids = [item['ingredient'].id for item in ingredients]
+            if len(ingredient_ids) != len(set(ingredient_ids)):
+                raise serializers.ValidationError(
+                    {'ingredients': 'Ингредиенты не должны повторяться.'}
+                )
+
+        return attrs
 
     def create_recipe_ingredients(self, recipe, ingredients_data):
         recipe_ingredients = [
             RecipeIngredient(
                 recipe=recipe,
-                ingredient_id=item['id'],
+                ingredient=item['ingredient'],
                 amount=item['amount']
             )
             for item in ingredients_data
@@ -282,3 +293,32 @@ class RecipeWriteSerializer(serializers.ModelSerializer):
             instance,
             context=self.context
         ).data
+
+
+class SubscribeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Subscription
+        fields = ('user', 'author')
+        read_only_fields = ('user', 'author')
+
+    def validate(self, attrs):
+        request = self.context['request']
+        author = self.context['author']
+
+        if request.user == author:
+            raise serializers.ValidationError(
+                {'errors': 'Нельзя подписаться на самого себя.'}
+            )
+
+        if Subscription.objects.filter(user=request.user, author=author).exists():
+            raise serializers.ValidationError(
+                {'errors': 'Вы уже подписаны на этого автора.'}
+            )
+
+        return attrs
+
+    def create(self, validated_data):
+        return Subscription.objects.create(
+            user=self.context['request'].user,
+            author=self.context['author']
+        )

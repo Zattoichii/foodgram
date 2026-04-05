@@ -1,5 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+from django.db.models import Count
 
 from .models import User, Subscription
 
@@ -12,6 +13,8 @@ class UserAdmin(BaseUserAdmin):
         'email',
         'first_name',
         'last_name',
+        'subscribers_count',
+        'recipes_count',
     )
     search_fields = (
         'email',
@@ -21,6 +24,21 @@ class UserAdmin(BaseUserAdmin):
         'email',
         'username',
     )
+
+    def get_queryset(self, request):
+        queryset = super().get_queryset(request)
+        return queryset.annotate(
+            subscribers_total=Count('subscribers', distinct=True),
+            recipes_total=Count('recipes', distinct=True),
+        )
+
+    @admin.display(description='Подписчиков')
+    def subscribers_count(self, obj):
+        return obj.subscribers_total
+
+    @admin.display(description='Рецептов')
+    def recipes_count(self, obj):
+        return obj.recipes_total
 
 
 @admin.register(Subscription)

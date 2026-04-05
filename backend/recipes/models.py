@@ -5,16 +5,21 @@ from users.models import User
 
 import uuid
 
+max_length_200 = 200
+max_length_50 = 50
+max_length_256 = 256
+max_length_12 = 12
+
 
 class Tag(models.Model):
     name = models.CharField(
         'Название',
-        max_length=200,
+        max_length=max_length_200,
         unique=True,
     )
     slug = models.SlugField(
         'Слаг',
-        max_length=200,
+        max_length=max_length_200,
         unique=True,
     )
 
@@ -30,11 +35,11 @@ class Tag(models.Model):
 class Ingredient(models.Model):
     name = models.CharField(
         'Название',
-        max_length=200,
+        max_length=max_length_200,
     )
     measurement_unit = models.CharField(
         'Единица измерения',
-        max_length=50,
+        max_length=max_length_50,
     )
 
     class Meta:
@@ -61,7 +66,7 @@ class Recipe(models.Model):
     )
     name = models.CharField(
         'Название',
-        max_length=256,
+        max_length=max_length_256,
     )
     image = models.ImageField(
         'Изображение',
@@ -91,21 +96,21 @@ class Recipe(models.Model):
     )
     short_code = models.CharField(
         'Короткий код',
-        max_length=12,
+        max_length=max_length_12,
         unique=True,
         blank=True,
         editable=False,
     )
 
-    def save(self, *args, **kwargs):
-        if not self.short_code:
-            self.short_code = uuid.uuid4().hex[:8]
-        super().save(*args, **kwargs)
-
     class Meta:
         verbose_name = 'Рецепт'
         verbose_name_plural = 'Рецепты'
         ordering = ('-created_at',)
+
+    def save(self, *args, **kwargs):
+        if not self.short_code:
+            self.short_code = uuid.uuid4().hex[:8]
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.name
@@ -143,7 +148,26 @@ class RecipeIngredient(models.Model):
         return f'{self.ingredient} — {self.amount}'
 
 
-class Favorite(models.Model):
+class UserRecipeBaseModel(models.Model):
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        verbose_name='Пользователь',
+    )
+    recipe = models.ForeignKey(
+        Recipe,
+        on_delete=models.CASCADE,
+        verbose_name='Рецепт',
+    )
+
+    class Meta:
+        abstract = True
+
+    def __str__(self):
+        return f'{self.user} → {self.recipe}'
+
+
+class Favorite(UserRecipeBaseModel):
     user = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
@@ -167,11 +191,8 @@ class Favorite(models.Model):
             )
         ]
 
-    def __str__(self):
-        return f'{self.user} → {self.recipe}'
 
-
-class ShoppingCart(models.Model):
+class ShoppingCart(UserRecipeBaseModel):
     user = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
@@ -194,6 +215,3 @@ class ShoppingCart(models.Model):
                 name='unique_shopping_cart',
             )
         ]
-
-    def __str__(self):
-        return f'{self.user} → {self.recipe}'
